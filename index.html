@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>POSWD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        .btn:active { transform: scale(0.96); }
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+        @media print {
+            body * { visibility: hidden; }
+            #talao, #talao * { visibility: visible; }
+            #talao { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col h-screen overflow-hidden select-none">
+
+    <!-- ══════════ TELA ABERTURA DO DIA ══════════ -->
+    <div id="tela-dia" class="hidden flex-col items-center justify-center h-full p-6 bg-gray-900 absolute inset-0 z-50 flex">
+        <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 w-full max-w-sm shadow-2xl text-center">
+            <span class="text-3xl">&#x26A1;</span>
+            <h1 class="text-2xl font-bold mt-2">POS<span class="text-amber-500">WD</span></h1>
+            <p class="text-xs text-gray-400 mt-1 mb-1">O dia está fechado.</p>
+            <p class="text-xs text-gray-500 mb-4" id="infoUltimoFecho"></p>
+            <p class="text-xs text-gray-400 mb-3">Abertura do Dia — PIN do ADMIN ou CAIXA</p>
+            <input type="password" id="inputCodigoDia" placeholder="PIN de acesso" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-center text-xl tracking-widest text-amber-500 mb-3 focus:outline-none focus:border-amber-500">
+            <input type="number" id="inputAberturaMontante" placeholder="Montante de abertura (MT)" min="0" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-center text-xl text-emerald-400 mb-4 focus:outline-none focus:border-amber-500">
+            <button onclick="abrirDia()" class="btn w-full bg-amber-500 text-gray-900 font-bold py-3 rounded-xl hover:bg-amber-400 transition">ABRIR DIA</button>
+            <p id="msgErroDia" class="text-xs text-red-400 mt-3 h-4"></p>
+            <div class="flex justify-center gap-4 mt-2">
+                <button onclick="mostrarHistorico()" class="text-xs text-gray-500 hover:text-gray-300 underline">&#x1F4C8; Histórico</button>
+                <button onclick="mostrarGestao()" class="text-xs text-gray-500 hover:text-gray-300 underline">&#x2699;&#xFE0F; Produtos</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ TELA HISTÓRICO ══════════ -->
+    <div id="tela-historico" class="hidden absolute inset-0 z-50 bg-gray-900 flex flex-col">
+        <header class="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700 shrink-0">
+            <h2 class="font-bold">&#x1F4C8; Histórico de Fechos</h2>
+            <div class="flex gap-2">
+                <button onclick="exportarCSV()" class="btn text-xs bg-emerald-500/20 text-emerald-400 px-3 py-2 rounded-lg hover:bg-emerald-500/30">&#x2B07; CSV</button>
+                <button onclick="fecharHistorico()" class="btn text-xs bg-gray-700 px-3 py-2 rounded-lg hover:bg-gray-600">&#x2190; Voltar</button>
+            </div>
+        </header>
+        <div id="listaHistorico" class="flex-1 overflow-y-auto p-4 space-y-3 max-w-2xl w-full mx-auto"></div>
+    </div>
+
+    <!-- ══════════ TELA GESTÃO DE PRODUTOS ══════════ -->
+    <div id="tela-gestao" class="hidden absolute inset-0 z-50 bg-gray-900 flex flex-col">
+        <header class="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700 shrink-0">
+            <h2 class="font-bold">&#x2699;&#xFE0F; Gestão de Produtos</h2>
+            <button onclick="fecharGestao()" class="btn text-xs bg-gray-700 px-3 py-2 rounded-lg hover:bg-gray-600">&#x2190; Voltar</button>
+        </header>
+        <div class="flex-1 overflow-y-auto p-4 max-w-2xl w-full mx-auto">
+            <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <input type="text" id="gpNome" placeholder="Nome do produto" class="bg-gray-900 border border-gray-700 p-2 rounded-lg text-sm focus:outline-none focus:border-amber-500">
+                <input type="number" id="gpPreco" placeholder="Preço (MT)" min="0" class="bg-gray-900 border border-gray-700 p-2 rounded-lg text-sm text-emerald-400 focus:outline-none focus:border-amber-500">
+                <input type="text" id="gpEmoji" placeholder="Emoji (ex: 🍔)" maxlength="4" class="bg-gray-900 border border-gray-700 p-2 rounded-lg text-sm focus:outline-none focus:border-amber-500">
+                <button onclick="guardarProduto()" class="btn bg-amber-500 text-gray-900 text-sm font-bold rounded-lg hover:bg-amber-400">Adicionar</button>
+            </div>
+            <p id="msgErroGestao" class="text-xs text-red-400 h-4 mb-2"></p>
+            <div id="listaGestao" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- ══════════ TELA PRINCIPAL (PDV) ══════════ -->
+    <div id="tela-pos" class="hidden flex-col h-full flex">
+        <header class="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700 shrink-0">
+            <div class="flex items-center gap-3">
+                <span class="text-xl">&#x26A1;</span>
+                <h1 class="font-bold">POS<span class="text-amber-500">WD</span></h1>
+                <span id="badgeOperador" class="text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded-full"></span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="relogio" class="text-xs text-gray-400 mr-2"></span>
+                <button onclick="mostrarModal('modal-sangria')" class="btn bg-orange-500/20 text-orange-400 text-xs font-bold px-3 py-2 rounded-lg hover:bg-orange-500/30">SANGRIA</button>
+                <button onclick="mostrarModal('modal-pagamento')" class="btn bg-emerald-500 text-gray-900 text-xs font-bold px-3 py-2 rounded-lg hover:bg-emerald-400">PAGAR</button>
+                <button onclick="iniciarFecho()" class="btn bg-red-500/20 text-red-400 text-xs font-bold px-3 py-2 rounded-lg hover:bg-red-500/30">FECHO</button>
+            </div>
+        </header>
+
+        <main class="flex flex-1 overflow-hidden">
+            <section class="flex-1 overflow-y-auto p-4">
+                <input type="text" id="buscaProduto" oninput="renderProdutos()" placeholder="&#x1F50D; Pesquisar produto..." class="w-full bg-gray-800 border border-gray-700 p-3 rounded-xl mb-4 focus:outline-none focus:border-amber-500">
+                <div id="gridProdutos" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+            </section>
+
+            <aside class="w-80 sm:w-96 bg-gray-800 border-l border-gray-700 flex flex-col shrink-0">
+                <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                    <h2 class="font-bold">&#x1F6D2; Carrinho <span id="contItens" class="text-xs text-gray-400"></span></h2>
+                    <button onclick="limparCarrinho()" class="text-xs text-red-400 hover:text-red-300">Limpar</button>
+                </div>
+                <div id="listaCarrinho" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
+                <div class="p-4 border-t border-gray-700 space-y-2">
+                    <div class="flex justify-between text-sm text-gray-400">
+                        <span>Subtotal</span><span id="subtotalTxt">MT 0,00</span>
+                    </div>
+                    <div class="flex justify-between text-sm text-gray-400 items-center">
+                        <span>Desconto (MT)</span>
+                        <input type="number" id="inputDesconto" min="0" oninput="renderTotais()" class="w-24 bg-gray-900 border border-gray-700 p-1 rounded-lg text-right text-emerald-400 focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div class="flex justify-between font-bold text-xl pt-2 border-t border-gray-700">
+                        <span>TOTAL</span><span id="totalTxt" class="text-amber-500">MT 0,00</span>
+                    </div>
+                    <button onclick="mostrarModal('modal-pagamento')" class="btn w-full bg-emerald-500 text-gray-900 font-bold py-3 rounded-xl hover:bg-emerald-400 transition mt-2">PAGAR &#x27A1;</button>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- ══════════ MODAL SANGRIA ══════════ -->
+    <div id="modal-sangria" class="hidden absolute inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 class="font-bold text-lg mb-1">&#x1F3E7; Sangria de Gaveta</h3>
+            <p class="text-xs text-gray-400 mb-4">Retirada de dinheiro da gaveta (leva/despesa).</p>
+            <input type="number" id="inputSangriaValor" placeholder="Valor a retirar (MT)" min="0" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-center text-lg text-orange-400 mb-3 focus:outline-none focus:border-amber-500">
+            <input type="text" id="inputSangriaMotivo" placeholder="Motivo (ex: pagamento fornecedor)" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-sm mb-3 focus:outline-none focus:border-amber-500">
+            <p id="msgErroSangria" class="text-xs text-red-400 text-center h-4 mb-2"></p>
+            <div class="flex gap-2">
+                <button onclick="fecharModal('modal-sangria')" class="btn flex-1 bg-gray-700 py-3 rounded-xl hover:bg-gray-600">Cancelar</button>
+                <button onclick="confirmarSangria()" class="btn flex-1 bg-orange-500 text-gray-900 font-bold py-3 rounded-xl hover:bg-orange-400">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ MODAL PAGAMENTO ══════════ -->
+    <div id="modal-pagamento" class="hidden absolute inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 class="font-bold text-lg mb-1">Pagamento</h3>
+            <p class="text-sm text-gray-400 mb-4">Total: <span id="totalModal" class="text-amber-500 font-bold"></span></p>
+            <div class="grid grid-cols-3 gap-2 mb-4" id="metodosPagamento">
+                <button data-metodo="dinheiro" class="btn metodo-btn border border-gray-700 rounded-xl py-3 text-sm hover:border-amber-500">&#x1F4B5;<br>Dinheiro</button>
+                <button data-metodo="mpesa" class="btn metodo-btn border border-gray-700 rounded-xl py-3 text-sm hover:border-amber-500">&#x1F4F1;<br>M-Pesa</button>
+                <button data-metodo="cartao" class="btn metodo-btn border border-gray-700 rounded-xl py-3 text-sm hover:border-amber-500">&#x1F4B3;<br>Cartão</button>
+            </div>
+            <div id="areaTroco" class="hidden mb-4">
+                <input type="number" id="inputRecebido" oninput="calcTroco()" placeholder="Valor recebido (MT)" min="0" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-center text-lg text-emerald-400 mb-2 focus:outline-none focus:border-amber-500">
+                <p class="text-center text-sm">Troco: <span id="trocoTxt" class="font-bold text-emerald-400">MT 0,00</span></p>
+            </div>
+            <p id="msgErroPagamento" class="text-xs text-red-400 text-center h-4 mb-2"></p>
+            <div class="flex gap-2">
+                <button onclick="fecharModal('modal-pagamento')" class="btn flex-1 bg-gray-700 py-3 rounded-xl hover:bg-gray-600">Cancelar</button>
+                <button onclick="confirmarPagamento()" class="btn flex-1 bg-emerald-500 text-gray-900 font-bold py-3 rounded-xl hover:bg-emerald-400">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ MODAL TALÃO ══════════ -->
+    <div id="modal-talao" class="hidden absolute inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] flex flex-col">
+            <div id="talao" class="p-6 text-sm overflow-y-auto"></div>
+            <div class="p-4 border-t border-gray-700 flex gap-2">
+                <button onclick="fecharModal('modal-talao')" class="btn flex-1 bg-gray-700 py-3 rounded-xl hover:bg-gray-600">Fechar</button>
+                <button onclick="window.print()" class="btn flex-1 bg-amber-500 text-gray-900 font-bold py-3 rounded-xl hover:bg-amber-400">&#x1F5A8;&#xFE0F; Imprimir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ MODAL FECHO ══════════ -->
+    <div id="modal-fecho" class="hidden absolute inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 class="font-bold text-lg mb-4">&#x1F4C5; Fecho do Dia</h3>
+            <div id="resumoFecho" class="space-y-2 text-sm mb-4"></div>
+            <p class="text-xs text-gray-400 mb-2">Confirme com o PIN do ADMIN:</p>
+            <input type="password" id="inputPinFecho" placeholder="PIN do ADMIN" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-center tracking-widest text-amber-500 mb-3 focus:outline-none focus:border-amber-500">
+            <p id="msgErroFecho" class="text-xs text-red-400 text-center h-4 mb-2"></p>
+            <div class="flex gap-2">
+                <button onclick="fecharModal('modal-fecho')" class="btn flex-1 bg-gray-700 py-3 rounded-xl hover:bg-gray-600">Voltar</button>
+                <button onclick="confirmarFecho()" class="btn flex-1 bg-red-500 text-white font-bold py-3 rounded-xl hover:bg-red-400">FECHAR DIA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ MODAL SUCESSO ══════════ -->
+    <div id="modal-sucesso" class="hidden absolute inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+        <div class="bg-gray-800 border border-emerald-500 rounded-2xl w-full max-w-xs p-8 text-center shadow-2xl">
+            <span class="text-5xl">&#x2705;</span>
+            <p id="msgSucesso" class="font-bold mt-3 text-emerald-400"></p>
+            <p id="detalheSucesso" class="text-sm text-gray-400 mt-1"></p>
+            <button onclick="fecharModal('modal-sucesso')" class="btn mt-5 w-full bg-emerald-500 text-gray-900 font-bold py-3 rounded-xl">OK</button>
+        </div>
+    </div>
+
+<script>
+/* ═══════════ CONFIGURAÇÃO ═══════════ */
+const PINS = { '1234': 'ADMIN', '1111': 'CAIXA' };
+
+const PRODUTOS_PADRAO = [
+    { id: 1,  nome: 'Coca-Cola 350ml',  preco: 35,  emoji: '🥤' },
+    { id: 2,  nome: 'Água 500ml',       preco: 20,  emoji: '💧' },
+    { id: 3,  nome: 'Pão de Alho',      preco: 45,  emoji: '🥖' },
+    { id: 4,  nome: 'Frango Grelhado',  preco: 180, emoji: '🍗' },
+    { id: 5,  nome: 'Arroz c/ Camarão', preco: 220, emoji: '🍤' },
+    { id: 6,  nome: 'Batata Frita',     preco: 90,  emoji: '🍟' },
+    { id: 7,  nome: 'Hambúrguer',       preco: 120, emoji: '🍔' },
+    { id: 8,  nome: 'Pizza Fatia',      preco: 150, emoji: '🍕' },
+    { id: 9,  nome: 'Sumo Natural',     preco: 60,  emoji: '🧃' },
+    { id: 10, nome: 'Café Espresso',    preco: 40,  emoji: '☕' },
+    { id: 11, nome: 'Bolo de Chocolate',preco: 70,  emoji: '🍰' },
+    { id: 12, nome: 'Gelado',           preco: 55,  emoji: '🍦' },
+];
+
+/* ═══════════ ESTADO ═══════════ */
+const CHAVE_STATE = 'poswd_state';
+const CHAVE_HIST  = 'poswd_historico';
+const CHAVE_PROD  = 'poswd_produtos';
+
+let state = JSON.parse(localStorage.getItem(CHAVE_STATE)) || { aberto: false };
+let produtos = JSON.parse(localStorage.getItem(CHAVE_PROD)) || PRODUTOS_PADRAO;
+let carrinho = [];
+let metodoSelecionado = 'dinheiro';
+let ultimaVenda = null;
+
+const fmt = v => 'MT ' + v.toFixed(2).replace('.', ',');
+const $ = id => document.getElementById(id);
+const getSangrias = () => (state.sangrias || []).reduce((s, x) => s + x.valor, 0);
+const salvarProdutos = () => localStorage.setItem(CHAVE_PROD, JSON.stringify(produtos));
+
+/* ═══════════ TELA ABERTURA ═══════════ */
+function mostrarTelaDia() {
+    const hist = JSON.parse(localStorage.getItem(CHAVE_HIST)) || [];
+    const ultimo = hist[hist.length - 1];
+    $('infoUltimoFecho').textContent = ultimo
+        ? `Último fecho: ${ultimo.data} — ${fmt(ultimo.totalVendas)} (${ultimo.vendas.length} vendas)`
+        : 'Nenhum fecho anterior registrado.';
+    $('tela-dia').classList.remove('hidden');
+    $('tela-dia').classList.add('flex');
+    $('tela-pos').classList.add('hidden');
+}
+
+function abrirDia() {
+    const pin = $('inputCodigoDia').value;
+    const montante = parseFloat($('inputAberturaMontante').value) || 0;
+    if (!PINS[pin]) { $('msgErroDia').textContent = 'PIN inválido.'; return; }
+    if (montante < 0) { $('msgErroDia').textContent = 'Montante inválido.'; return; }
+
+    state = { aberto: true, operador: PINS[pin], abertura: montante, abertoEm: new Date().toISOString(), vendas: [], sangrias: [] };
+    salvarState();
+    $('msgErroDia').textContent = '';
+    $('inputCodigoDia').value = '';
+    entrarNoPOS();
+}
+
+function entrarNoPOS() {
+    $('tela-dia').classList.add('hidden');
+    $('tela-dia').classList.remove('flex');
+    $('tela-pos').classList.remove('hidden');
+    $('badgeOperador').textContent = '👤 ' + state.operador;
+    renderProdutos();
+    renderCarrinho();
+    setInterval(() => {
+        $('relogio').textContent = new Date().toLocaleString('pt', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }, 1000);
+}
+
+/* ═══════════ HISTÓRICO + CSV ═══════════ */
+function mostrarHistorico() {
+    const hist = JSON.parse(localStorage.getItem(CHAVE_HIST)) || [];
+    $('listaHistorico').innerHTML = hist.length === 0
+        ? '<p class="text-center text-gray-500 py-8">Nenhum fecho registado ainda.</p>'
+        : [...hist].reverse().map(h => {
+            const sangrias = (h.sangrias || []).reduce((s, x) => s + x.valor, 0);
+            const dinheiro = h.vendas.filter(v => v.metodo === 'dinheiro').reduce((s, v) => s + v.total, 0);
+            return `
+            <div class="bg-gray-800 border border-gray-700 rounded-xl p-4">
+                <div class="flex justify-between items-center cursor-pointer" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                    <div>
+                        <p class="font-bold text-sm">${h.data}</p>
+                        <p class="text-xs text-gray-400">👤 ${h.operador} · ${h.vendas.length} vendas · gaveta: ${fmt(h.abertura + dinheiro - sangrias)}</p>
+                    </div>
+                    <p class="font-bold text-amber-500">${fmt(h.totalVendas)}</p>
+                </div>
+                <div class="hidden mt-3 pt-3 border-t border-gray-700 text-xs space-y-1">
+                    ${h.vendas.map(v => `<p class="flex justify-between text-gray-400"><span>${v.hora} — ${v.metodo.toUpperCase()} (${v.operador})</span><span>${fmt(v.total)}</span></p>`).join('') || '<p class="text-gray-500">Sem vendas neste dia.</p>'}
+                    ${(h.sangrias || []).map(s => `<p class="flex justify-between text-orange-400"><span>🏧 Sangria — ${s.motivo || 'sem motivo'}</span><span>−${fmt(s.valor)}</span></p>`).join('')}
+                </div>
+            </div>`;
+        }).join('');
+    $('tela-historico').classList.remove('hidden');
+}
+
+function fecharHistorico() { $('tela-historico').classList.add('hidden'); }
+
+function exportarCSV() {
+    const hist = JSON.parse(localStorage.getItem(CHAVE_HIST)) || [];
+    if (hist.length === 0) return;
+    let csv = 'Data;Operador;Hora;Metodo;Itens;Total;Desconto;Recebido;Troco\n';
+    hist.forEach(h => h.vendas.forEach(v => {
+        csv += [h.dat
